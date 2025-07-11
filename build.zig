@@ -1,4 +1,5 @@
 const package = "libarchive";
+
 const version: std.SemanticVersion = .{
     .major = 3,
     .minor = 7,
