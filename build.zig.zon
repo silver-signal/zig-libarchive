@@ -2,7 +2,7 @@
     .name = .libarchive,
     .version = "3.7.9",
     .fingerprint = 0x2cf9e53043e2c7c, // Changing this has security and trust implications.
-    .minimum_zig_version = "0.14.0",
+    .minimum_zig_version = "0.14.1",
     .paths = .{
         "build.zig",
         "build.zig.zon",
