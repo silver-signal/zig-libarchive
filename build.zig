@@ -15,6 +15,7 @@ pub fn build(b: *Build) void {
     const linkage = b.option(std.builtin.LinkMode, "linkage", "Link mode") orelse .static;
     const strip = b.option(bool, "strip", "Omit debug information");
     const pic = b.option(bool, "pic", "Produce Position Independent Code");
+    const sanitize_c = b.option(bool, "sanitize_c", "Enable C sanitizer") orelse false; // TODO: Switch to default true
 
     // Provide a helpful error message if a user tries to compile on an unsupported platform.
     switch (target.result.os.tag) {
@@ -47,6 +48,7 @@ pub fn build(b: *Build) void {
         .link_libc = true,
         .strip = strip,
         .pic = pic,
+        .sanitize_c = sanitize_c,
     });
     libarchive_module.addConfigHeader(config_h);
     libarchive_module.addIncludePath(upstream.path(""));
@@ -95,6 +97,7 @@ pub fn build(b: *Build) void {
         .link_libc = true,
         .strip = strip,
         .pic = pic,
+        .sanitize_c = sanitize_c,
     });
     libarchive_fe_module.addCSourceFiles(.{
         .root = upstream.path("libarchive_fe"),
@@ -124,6 +127,7 @@ pub fn build(b: *Build) void {
             .link_libc = true,
             .strip = strip,
             .pic = pic,
+            .sanitize_c = sanitize_c,
         });
         exe_module.addConfigHeader(config_h);
         exe_module.addIncludePath(upstream.path(""));
@@ -158,6 +162,9 @@ pub fn build(b: *Build) void {
             .target = target,
             .optimize = optimize,
             .link_libc = true,
+            .strip = strip,
+            .pic = pic,
+            .sanitize_c = sanitize_c,
         });
         test_module.addCSourceFiles(.{
             .root = upstream.path(mod_name),
