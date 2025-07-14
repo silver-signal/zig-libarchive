@@ -215,7 +215,7 @@ pub fn build(b: *Build) !void {
         exe_test_step.dependOn(&exe_test_run.step);
     }
 
-    const libarchive_test_step = b.step("libarchive_test", "Run the libarchive tests.");
+    const libarchive_test_step = b.step("libarchive_test", "Run the tests for libarchive.");
     test_step.dependOn(libarchive_test_step);
     const libarchive_test_module = b.createModule(.{
         .target = target,
@@ -379,8 +379,8 @@ fn configB2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void
 fn configBzip2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
     if (b.option(bool, "enable-bzip2", "Build support for bzip2 through libbz2 (default=true)") orelse true) {
         config_h.addValues(.{
-            .HAVE_BZLIB_H = null,
-            .HAVE_LIBBZ2 = null,
+            .HAVE_BZLIB_H = true,
+            .HAVE_LIBBZ2 = true,
         });
         if (b.lazyDependency("bzip2", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |bzip2| {
             module.linkLibrary(bzip2.artifact("bz2"));
