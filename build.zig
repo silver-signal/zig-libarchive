@@ -1,4 +1,5 @@
 const package = "libarchive";
+const package_name = package["lib".len..];
 
 const version: std.SemanticVersion = .{
     .major = 3,
@@ -7,7 +8,7 @@ const version: std.SemanticVersion = .{
 };
 const version_string = std.fmt.comptimePrint("{}", .{version});
 
-pub fn build(b: *Build) void {
+pub fn build(b: *Build) !void {
     const upstream = b.dependency(package, .{});
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -29,17 +30,29 @@ pub fn build(b: *Build) void {
     const config_h = getConfigHeader(b, upstream, target);
     configXAttr(config_h);
 
-    const package_name = package["lib".len..];
-    const defs = &.{
+    const flags_default: []const []const u8 = &.{
+        // CFLAGS
         "-Wall",
         "-Wformat",
         "-Wformat-security",
-        "-DHAVE_CONFIG_H=1",
         "-ffunction-sections",
         "-fdata-sections",
-        "-fvisibility=hidden",
+
+        // DEFS
+        "-DHAVE_CONFIG_H=1",
+
+        // DEAD_CODE_REMOVAL
+        "-Wl,--gc-sections",
+
+        // zig cc supports visibility annotations
         "-D__LIBARCHIVE_ENABLE_VISIBILITY",
+        "-fvisibility=hidden",
     };
+
+    var flags_list = try std.ArrayList([]const u8).initCapacity(b.allocator, flags_default.len);
+    try flags_list.appendSlice(flags_default);
+    //    if (linkage == .static) try flags_list.append("-DLIBARCHIVE_STATIC");
+    const flags: []const []const u8 = try flags_list.toOwnedSlice();
 
     // The core libarchive module. All other binaries depend on this.
     const libarchive_module = b.createModule(.{
@@ -55,7 +68,7 @@ pub fn build(b: *Build) void {
     libarchive_module.addCSourceFiles(.{
         .root = upstream.path("libarchive"),
         .files = libarchive_src,
-        .flags = defs,
+        .flags = flags,
     });
     configAcl(b, config_h, libarchive_module);
     configB2(b, config_h, libarchive_module);
@@ -102,7 +115,7 @@ pub fn build(b: *Build) void {
     libarchive_fe_module.addCSourceFiles(.{
         .root = upstream.path("libarchive_fe"),
         .files = libarchive_fe_src,
-        .flags = defs,
+        .flags = flags,
     });
     libarchive_fe_module.addIncludePath(upstream.path(""));
     libarchive_fe_module.addConfigHeader(config_h);
@@ -134,12 +147,12 @@ pub fn build(b: *Build) void {
         exe_module.addCSourceFiles(.{
             .root = upstream.path(mod_name),
             .files = src_map.get(mod_name) orelse unreachable,
-            .flags = defs,
+            .flags = flags,
         });
         exe_module.addCSourceFiles(.{
             .root = upstream.path(mod_name),
             .files = main_src_map.get(mod_name) orelse unreachable,
-            .flags = defs,
+            .flags = flags,
         });
         exe_module.addIncludePath(upstream.path("libarchive"));
         exe_module.linkLibrary(libarchive);
@@ -169,17 +182,17 @@ pub fn build(b: *Build) void {
         test_module.addCSourceFiles(.{
             .root = upstream.path(mod_name),
             .files = test_src_map.get(mod_name) orelse unreachable,
-            .flags = defs,
+            .flags = flags,
         });
         test_module.addCSourceFiles(.{
             .root = b.path(b.fmt("disabled_tests/{s}", .{mod_name})),
             .files = disabled_test_src_map.get(mod_name) orelse unreachable,
-            .flags = defs,
+            .flags = flags,
         });
         test_module.addCSourceFiles(.{
             .root = upstream.path("test_utils"),
             .files = test_utils_src,
-            .flags = defs,
+            .flags = flags,
         });
         test_module.addConfigHeader(config_h);
         test_module.addIncludePath(upstream.path(""));
@@ -212,17 +225,17 @@ pub fn build(b: *Build) void {
     libarchive_test_module.addCSourceFiles(.{
         .root = upstream.path("libarchive/test"),
         .files = libarchive_test_src,
-        .flags = defs,
+        .flags = flags,
     });
     libarchive_test_module.addCSourceFiles(.{
         .root = upstream.path("test_utils"),
         .files = test_utils_src,
-        .flags = defs,
+        .flags = flags,
     });
     libarchive_test_module.addCSourceFiles(.{
         .root = b.path("disabled_tests/libarchive"),
         .files = libarchive_test_disabled_src,
-        .flags = defs,
+        .flags = flags,
     });
     libarchive_test_module.addConfigHeader(config_h);
     libarchive_test_module.addIncludePath(upstream.path(""));
