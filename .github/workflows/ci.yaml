@@ -20,6 +20,9 @@ jobs:
       - name: Set up Zig
         uses: mlugg/setup-zig@v2
 
+      - name: Run `zig build -Dminimal=true`
+        run: zig build -Dminimal --summary all
+
       - name: Run `zig build`
         run: zig build --summary all
 
