@@ -12,6 +12,10 @@ pub fn build(b: *Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const linkage = b.option(std.builtin.LinkMode, "linkage", "Link mode") orelse .static;
+    const strip = b.option(bool, "strip", "Omit debug information");
+    const pic = b.option(bool, "pic", "Produce Position Independent Code");
+
     // Provide a helpful error message if a user tries to compile on an unsupported platform.
     switch (target.result.os.tag) {
         .linux => {},
@@ -41,6 +45,8 @@ pub fn build(b: *Build) void {
         .target = target,
         .optimize = optimize,
         .link_libc = true,
+        .strip = strip,
+        .pic = pic,
     });
     libarchive_module.addConfigHeader(config_h);
     libarchive_module.addIncludePath(upstream.path(""));
@@ -72,7 +78,7 @@ pub fn build(b: *Build) void {
     const libarchive = b.addLibrary(.{
         .name = package_name,
         .root_module = libarchive_module,
-        .linkage = .static,
+        .linkage = linkage,
     });
     libarchive.installHeadersDirectory(upstream.path("libarchive"), "", .{
         .include_extensions = &.{
@@ -87,6 +93,8 @@ pub fn build(b: *Build) void {
         .target = target,
         .optimize = optimize,
         .link_libc = true,
+        .strip = strip,
+        .pic = pic,
     });
     libarchive_fe_module.addCSourceFiles(.{
         .root = upstream.path("libarchive_fe"),
@@ -114,6 +122,8 @@ pub fn build(b: *Build) void {
             .target = target,
             .optimize = optimize,
             .link_libc = true,
+            .strip = strip,
+            .pic = pic,
         });
         exe_module.addConfigHeader(config_h);
         exe_module.addIncludePath(upstream.path(""));
