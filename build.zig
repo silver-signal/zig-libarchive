@@ -18,6 +18,8 @@ pub fn build(b: *Build) !void {
     const pic = b.option(bool, "pic", "Produce Position Independent Code");
     const sanitize_c = b.option(bool, "sanitize_c", "Enable C sanitizer") orelse false; // TODO: Switch to default true
 
+    const minimal = b.option(bool, "minimal", "Build minimal artifacts. Dependencies are all set to default=false. (default=false)") orelse false;
+
     // Provide a helpful error message if a user tries to compile on an unsupported platform.
     switch (target.result.os.tag) {
         .linux => {},
@@ -70,25 +72,25 @@ pub fn build(b: *Build) !void {
         .files = libarchive_src,
         .flags = flags,
     });
-    configAcl(b, config_h, libarchive_module);
-    configB2(b, config_h, libarchive_module);
-    configBzip2(b, config_h, libarchive_module);
-    configExpat(b, config_h, libarchive_module);
-    configIconv(b, config_h, libarchive_module);
-    configLz4(b, config_h, libarchive_module);
-    configLzma(b, config_h, libarchive_module);
-    configLzo2(b, config_h, libarchive_module);
-    configRegex(b, config_h, libarchive_module);
-    configXml2(b, config_h, libarchive_module);
-    configZlib(b, config_h, libarchive_module);
-    configZstd(b, config_h, libarchive_module);
+    configAcl(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configB2(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configBzip2(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configExpat(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configIconv(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configLz4(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configLzma(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configLzo2(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configRegex(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configXml2(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configZlib(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configZstd(b, config_h, libarchive_module, .{ .minimal = minimal });
 
     // TODO: The configure script does some specialized things for the crypto libraries.
     // For now, we'll just configure as normal, but we'll need to add special steps in the future.
-    configCng(b, config_h, libarchive_module);
-    configMbedTls(b, config_h, libarchive_module);
-    configNettle(b, config_h, libarchive_module);
-    configOpenSsl(b, config_h, libarchive_module);
+    configCng(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configMbedTls(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configNettle(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configOpenSsl(b, config_h, libarchive_module, .{ .minimal = minimal });
 
     const libarchive = b.addLibrary(.{
         .name = package_name,
@@ -288,11 +290,16 @@ fn configXAttr(config_h: *Step.ConfigHeader) void {
     });
 }
 
-fn configAcl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
+const ConfigOptions = struct {
+    minimal: bool,
+};
+
+fn configAcl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
     // TODO:
-    // const enable_acl = b.option(bool, enable-acl, "Enable acl support (default=true)");
+    // const enable_acl = b.option(bool, enable-acl, "Enable acl support (default=true)") orelse !options.minimal;
     _ = b;
     _ = module;
+    _ = options;
     config_h.addValues(.{
         .ARCHIVE_ACL_DARWIN = null,
         .ARCHIVE_ACL_FREEBSD = null,
@@ -366,18 +373,19 @@ fn configAcl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) voi
     });
 }
 
-fn configB2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
+fn configB2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
     // TODO: Add libb2 support.
     _ = b;
     _ = module;
+    _ = options;
     config_h.addValues(.{
         .HAVE_BLAKE2_H = null,
         .HAVE_LIBB2 = null,
     });
 }
 
-fn configBzip2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
-    if (b.option(bool, "enable-bzip2", "Build support for bzip2 through libbz2 (default=true)") orelse true) {
+fn configBzip2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
+    if (b.option(bool, "enable-bzip2", "Build support for bzip2 through libbz2 (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
             .HAVE_BZLIB_H = true,
             .HAVE_LIBBZ2 = true,
@@ -393,19 +401,21 @@ fn configBzip2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) v
     }
 }
 
-fn configCng(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
+fn configCng(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
     // TODO: Add CNG library support
     _ = b;
     _ = module;
+    _ = options;
     config_h.addValues(.{
         .HAVE_BCRYPT_H = null,
     });
 }
 
-fn configMbedTls(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
+fn configMbedTls(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
     // TODO: Add mbedtls library support
     _ = b;
     _ = module;
+    _ = options;
     config_h.addValues(.{
         .HAVE_MBEDTLS_AES_H = null,
         .HAVE_MBEDTLS_MD_H = null,
@@ -420,21 +430,22 @@ fn configMbedTls(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module)
     });
 }
 
-fn configExpat(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
+fn configExpat(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
     // TODO: Add Expat library support.
     _ = b;
     _ = module;
+    _ = options;
     config_h.addValues(.{
         .HAVE_EXPAT_H = null,
         .HAVE_LIBEXPAT = null,
     });
 }
 
-fn configIconv(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
+fn configIconv(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
     config_h.addValues(.{
         .HAVE_LOCALE_CHARSET = null,
     });
-    if (b.option(bool, "enable-iconv", "Enable iconv support (default=true)") orelse true) {
+    if (b.option(bool, "enable-iconv", "Enable iconv support (default=true)") orelse !options.minimal) {
         const target = module.resolved_target.?;
         const optimize = module.optimize.?;
 
@@ -480,8 +491,8 @@ fn configIconv(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) v
     }
 }
 
-fn configLz4(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
-    if (b.option(bool, "enable-lz4", "Build support for lz4 through liblz4 (default=true)") orelse true) {
+fn configLz4(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
+    if (b.option(bool, "enable-lz4", "Build support for lz4 through liblz4 (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
             .HAVE_LIBLZ4 = true,
             .HAVE_LZ4HC_H = true,
@@ -499,10 +510,11 @@ fn configLz4(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) voi
     }
 }
 
-fn configLzma(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
+fn configLzma(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
     // TODO: Add LZMA library
     _ = b;
     _ = module;
+    _ = options;
     config_h.addValues(.{
         .HAVE_LIBLZMA = null,
         .HAVE_LZMA_H = null,
@@ -510,10 +522,11 @@ fn configLzma(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) vo
     });
 }
 
-fn configLzo2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
+fn configLzo2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
     // TODO: Add LZO2 library
     _ = b;
     _ = module;
+    _ = options;
     config_h.addValues(.{
         .HAVE_LIBLZO2 = null,
         .HAVE_LZO_LZO1X_H = null,
@@ -521,10 +534,11 @@ fn configLzo2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) vo
     });
 }
 
-fn configNettle(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
+fn configNettle(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
     // TODO: Add Nettle library
     _ = b;
     _ = module;
+    _ = options;
     config_h.addValues(.{
         .ARCHIVE_CRYPTO_MD5_NETTLE = null,
         .ARCHIVE_CRYPTO_RMD160_NETTLE = null,
@@ -542,14 +556,13 @@ fn configNettle(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) 
     });
 }
 
-fn configOpenSsl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
-
+fn configOpenSsl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
     // TODO: add support for OpenSSL libcrypto
     config_h.addValues(.{
         .HAVE_LIBCRYPTO = null,
     });
 
-    if (b.option(bool, "enable-openssl", "Build support for mtree and xar hashes through openssl (default=true)") orelse true) {
+    if (b.option(bool, "enable-openssl", "Build support for mtree and xar hashes through openssl (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
             .HAVE_LIBCRYPTO = null,
             .HAVE_OPENSSL_EVP_H = true,
@@ -590,9 +603,10 @@ fn configOpenSsl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module)
     });
 }
 
-fn configRegex(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
+fn configRegex(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
     _ = b;
     _ = module;
+    _ = options;
     // TODO: Configure regex expression support.
     config_h.addValues(.{
         .HAVE_REGEX_H = null,
@@ -608,8 +622,8 @@ fn configRegex(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) v
     });
 }
 
-fn configXml2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
-    if (b.option(bool, "enable-xml2", "Build support for xar through libxml2 (default=true)") orelse true) {
+fn configXml2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
+    if (b.option(bool, "enable-xml2", "Build support for xar through libxml2 (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
             .HAVE_LIBXML2 = true,
             .HAVE_LIBXML_XMLREADER_H = true,
@@ -627,8 +641,8 @@ fn configXml2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) vo
     }
 }
 
-fn configZlib(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
-    if (b.option(bool, "enable-zlib", "Build support for gzip through zlib (default=true)") orelse true) {
+fn configZlib(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
+    if (b.option(bool, "enable-zlib", "Build support for gzip through zlib (default=true)") orelse !options.minimal) {
         config_h.addValues(.{ .HAVE_ZLIB_H = true });
         if (b.lazyDependency("zlib", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |zlib| {
             module.linkLibrary(zlib.artifact("z"));
@@ -638,8 +652,8 @@ fn configZlib(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) vo
     }
 }
 
-fn configZstd(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module) void {
-    if (b.option(bool, "enable-zstd", "Build support for zstd through libzstd (default=true)") orelse true) {
+fn configZstd(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
+    if (b.option(bool, "enable-zstd", "Build support for zstd through libzstd (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
             .HAVE_LIBZSTD = true,
             .HAVE_ZSTD_H = true,
