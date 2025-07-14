@@ -235,9 +235,10 @@ pub fn build(b: *Build) void {
         .name = "libarchive_test",
         .root_module = libarchive_test_module,
     });
-    //libarchive_test.step.dependOn(run_configure_step);
     const libarchive_test_run = b.addRunArtifact(libarchive_test);
     libarchive_test_run.setCwd(upstream.path(""));
+    libarchive_test_run.addArg("-v");
+    libarchive_test_run.addArg("-d");
     libarchive_test_step.dependOn(&libarchive_test_run.step);
 }
 
