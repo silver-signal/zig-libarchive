@@ -3,8 +3,8 @@ const package_name = package["lib".len..];
 
 const version: std.SemanticVersion = .{
     .major = 3,
-    .minor = 7,
-    .patch = 9,
+    .minor = 8,
+    .patch = 1,
 };
 const version_string = std.fmt.comptimePrint("{}", .{version});
 
@@ -53,7 +53,7 @@ pub fn build(b: *Build) !void {
 
     var flags_list = try std.ArrayList([]const u8).initCapacity(b.allocator, flags_default.len);
     try flags_list.appendSlice(flags_default);
-    //    if (linkage == .static) try flags_list.append("-DLIBARCHIVE_STATIC");
+    if (linkage == .static) try flags_list.append("-DLIBARCHIVE_STATIC");
     const flags: []const []const u8 = try flags_list.toOwnedSlice();
 
     // The core libarchive module. All other binaries depend on this.
