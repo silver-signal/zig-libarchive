@@ -181,14 +181,21 @@ pub fn build(b: *Build) !void {
             .pic = pic,
             .sanitize_c = sanitize_c,
         });
+        if (std.mem.eql(u8, mod_name, "cpio")) {
+            test_module.addCSourceFiles(.{
+                .root = upstream.path(mod_name),
+                .files = src_map.get(mod_name).?,
+                .flags = flags,
+            });
+        }
         test_module.addCSourceFiles(.{
             .root = upstream.path(mod_name),
-            .files = test_src_map.get(mod_name) orelse unreachable,
+            .files = test_src_map.get(mod_name).?,
             .flags = flags,
         });
         test_module.addCSourceFiles(.{
             .root = b.path(b.fmt("disabled_tests/{s}", .{mod_name})),
-            .files = disabled_test_src_map.get(mod_name) orelse unreachable,
+            .files = disabled_test_src_map.get(mod_name).?,
             .flags = flags,
         });
         test_module.addCSourceFiles(.{
@@ -1568,8 +1575,8 @@ const libarchive_test_disabled_src: []const []const u8 = &.{
 };
 
 const test_src_map = StaticStringMap([]const []const u8).initComptime(.{
-    .{ "cat", bsdcat_src ++ bsdcat_test_src },
-    .{ "cpio", bsdcpio_src ++ bsdcpio_test_src },
+    .{ "cat", bsdcat_test_src },
+    .{ "cpio", bsdcpio_test_src },
     .{ "tar", bsdtar_test_src },
     .{ "unzip", bsdunzip_test_src },
 });
