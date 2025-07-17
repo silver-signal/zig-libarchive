@@ -267,6 +267,7 @@ fn configXAttr(config_h: *Step.ConfigHeader) void {
         .ARCHIVE_XATTR_DARWIN = null,
         .ARCHIVE_XATTR_FREEBSD = null,
         .ARCHIVE_XATTR_LINUX = null,
+        .LIBATTR_PKGCONFIG_VERSION = null,
         .HAVE_DECL_XATTR_NOFOLLOW = null,
         .HAVE_GETXATTR = null,
         .HAVE_SETXATTR = null,
@@ -370,6 +371,8 @@ fn configAcl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, opt
         .HAVE_DECL_GETACL = null,
         .HAVE_DECL_SETACL = null,
         .HAVE_DECL_GETACLCNT = null,
+        .LIBACL_PKGCONFIG_VERSION = null,
+        .LIBRICHACL_PKGCONFIG_VERSION = null,
     });
 }
 
@@ -381,6 +384,7 @@ fn configB2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, opti
     config_h.addValues(.{
         .HAVE_BLAKE2_H = null,
         .HAVE_LIBB2 = null,
+        .LIBB2_PKGCONFIG_VERSION = null,
     });
 }
 
@@ -420,6 +424,7 @@ fn configMbedTls(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module,
         .HAVE_MBEDTLS_AES_H = null,
         .HAVE_MBEDTLS_MD_H = null,
         .HAVE_MBEDTLS_PKCS5_H = null,
+        .HAVE_MBEDTLS_VERSION_H = null,
         .HAVE_LIBMBEDCRYPTO = null,
         .ARCHIVE_CRYPTO_MD5_MBEDTLS = null,
         .ARCHIVE_CRYPTO_RMD160_MBEDTLS = null,
@@ -464,12 +469,14 @@ fn configIconv(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, o
         switch (impl) {
             .libc => {
                 config_h.addValues(.{
+                    .HAVE_LIBICONV = null,
                     .HAVE_LOCALCHARSET_H = null,
                     .HAVE_LIBCHARSET = null,
                 });
             },
             .libiconv => {
                 config_h.addValues(.{
+                    .HAVE_LIBICONV = true,
                     .HAVE_LOCALCHARSET_H = true,
                     .HAVE_LIBCHARSET = true,
                 });
@@ -484,6 +491,7 @@ fn configIconv(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, o
         config_h.addValues(.{
             .HAVE_ICONV_H = null,
             .HAVE_ICONV = null,
+            .HAVE_LIBICONV = null,
             .ICONV_CONST = null,
             .HAVE_LOCALCHARSET_H = null,
             .HAVE_LIBCHARSET = null,
@@ -553,6 +561,7 @@ fn configNettle(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, 
         .HAVE_NETTLE_PBKDF2_H = null,
         .HAVE_NETTLE_RIPEMD160_H = null,
         .HAVE_NETTLE_SHA_H = null,
+        .HAVE_NETTLE_VERSION_H = null,
     });
 }
 
@@ -564,8 +573,8 @@ fn configOpenSsl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module,
 
     if (b.option(bool, "enable-openssl", "Build support for mtree and xar hashes through openssl (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
-            .HAVE_LIBCRYPTO = null,
             .HAVE_OPENSSL_EVP_H = true,
+            .HAVE_OPENSSL_OPENSSLV_H = true,
             .ARCHIVE_CRYPTO_MD5_OPENSSL = true,
             .ARCHIVE_CRYPTO_RMD160_OPENSSL = true,
             .ARCHIVE_CRYPTO_SHA1_OPENSSL = true,
@@ -579,6 +588,7 @@ fn configOpenSsl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module,
     } else {
         config_h.addValues(.{
             .HAVE_OPENSSL_EVP_H = null,
+            .HAVE_OPENSSL_OPENSSLV_H = null,
             .ARCHIVE_CRYPTO_MD5_OPENSSL = null,
             .ARCHIVE_CRYPTO_RMD160_OPENSSL = null,
             .ARCHIVE_CRYPTO_SHA1_OPENSSL = null,
@@ -628,6 +638,7 @@ fn configXml2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, op
             .HAVE_LIBXML2 = true,
             .HAVE_LIBXML_XMLREADER_H = true,
             .HAVE_LIBXML_XMLWRITER_H = true,
+            .HAVE_LIBXML_XMLVERSION_H = true,
         });
         if (b.lazyDependency("libxml2", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |libxml2| {
             module.linkLibrary(libxml2.artifact("xml"));
@@ -637,18 +648,25 @@ fn configXml2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, op
             .HAVE_LIBXML2 = null,
             .HAVE_LIBXML_XMLREADER_H = null,
             .HAVE_LIBXML_XMLWRITER_H = null,
+            .HAVE_LIBXML_XMLVERSION_H = null,
         });
     }
 }
 
 fn configZlib(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
     if (b.option(bool, "enable-zlib", "Build support for gzip through zlib (default=true)") orelse !options.minimal) {
-        config_h.addValues(.{ .HAVE_ZLIB_H = true });
+        config_h.addValues(.{
+            .HAVE_ZLIB_H = true,
+            .HAVE_LIBZ = true,
+        });
         if (b.lazyDependency("zlib", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |zlib| {
             module.linkLibrary(zlib.artifact("z"));
         }
     } else {
-        config_h.addValues(.{ .HAVE_ZLIB_H = null });
+        config_h.addValues(.{
+            .HAVE_ZLIB_H = null,
+            .HAVE_LIBZ = null,
+        });
     }
 }
 
@@ -658,6 +676,7 @@ fn configZstd(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, op
             .HAVE_LIBZSTD = true,
             .HAVE_ZSTD_H = true,
             .HAVE_ZSTD_compressStream = true,
+            .HAVE_ZSTD_minCLevel = true,
         });
         if (b.lazyDependency("zstd", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |zstd| {
             module.linkLibrary(zstd.artifact("zstd"));
@@ -667,6 +686,7 @@ fn configZstd(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, op
             .HAVE_LIBZSTD = null,
             .HAVE_ZSTD_H = null,
             .HAVE_ZSTD_compressStream = null,
+            .HAVE_ZSTD_minCLevel = null,
         });
     }
 }
