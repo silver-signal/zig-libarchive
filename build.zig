@@ -128,8 +128,7 @@ pub fn build(b: *Build) !void {
         .linkage = .static,
     });
 
-    const module_names: []const []const u8 = &.{ "cat", "cpio", "tar", "unzip" };
-    for (module_names) |mod_name| {
+    for ([_][]const u8{ "cat", "cpio", "tar", "unzip" }) |mod_name| {
         const enable_module_arg = b.fmt("enable-bsd{s}", .{mod_name});
         const enable_module_msg = b.fmt("enable build of bsd{s} (default=true)", .{mod_name});
         const enable_module = b.option(bool, enable_module_arg, enable_module_msg) orelse true;
@@ -146,18 +145,21 @@ pub fn build(b: *Build) !void {
         });
         exe_module.addConfigHeader(config_h);
         exe_module.addIncludePath(upstream.path(""));
+
         exe_module.addCSourceFiles(.{
             .root = upstream.path(mod_name),
-            .files = src_map.get(mod_name) orelse unreachable,
+            .files = src_map.get(mod_name).?,
             .flags = flags,
         });
         exe_module.addCSourceFiles(.{
             .root = upstream.path(mod_name),
-            .files = main_src_map.get(mod_name) orelse unreachable,
+            .files = main_src_map.get(mod_name).?,
             .flags = flags,
         });
+
         exe_module.addIncludePath(upstream.path("libarchive"));
         exe_module.linkLibrary(libarchive);
+
         exe_module.addIncludePath(upstream.path("libarchive_fe"));
         exe_module.linkLibrary(libarchive_fe);
 
@@ -181,13 +183,9 @@ pub fn build(b: *Build) !void {
             .pic = pic,
             .sanitize_c = sanitize_c,
         });
-        if (std.mem.eql(u8, mod_name, "cpio")) {
-            test_module.addCSourceFiles(.{
-                .root = upstream.path(mod_name),
-                .files = src_map.get(mod_name).?,
-                .flags = flags,
-            });
-        }
+        test_module.addConfigHeader(config_h);
+        test_module.addIncludePath(upstream.path(""));
+
         const mod_test_path = upstream.path(b.fmt("{s}/test", .{mod_name}));
         test_module.addCSourceFiles(.{
             .root = mod_test_path,
@@ -199,18 +197,28 @@ pub fn build(b: *Build) !void {
             .files = disabled_test_src_map.get(mod_name).?,
             .flags = flags,
         });
+
+        test_module.addIncludePath(upstream.path("test_utils"));
         test_module.addCSourceFiles(.{
             .root = upstream.path("test_utils"),
             .files = test_utils_src,
             .flags = flags,
         });
-        test_module.addConfigHeader(config_h);
-        test_module.addIncludePath(upstream.path(""));
-        test_module.addIncludePath(upstream.path("test_utils"));
+
+        if (std.mem.eql(u8, mod_name, "cpio")) {
+            test_module.addCSourceFiles(.{
+                .root = upstream.path(mod_name),
+                .files = src_map.get(mod_name).?,
+                .flags = flags,
+            });
+        }
+
         test_module.addIncludePath(upstream.path("libarchive"));
         test_module.linkLibrary(libarchive);
+
         test_module.addIncludePath(upstream.path(mod_name));
         test_module.addIncludePath(mod_test_path);
+
         test_module.addIncludePath(upstream.path("libarchive_fe"));
         test_module.linkLibrary(libarchive_fe);
 
