@@ -2004,6 +2004,7 @@ const bsdtar_test_src: []const []const u8 = &.{
     "test/test_option_lz4.c",
     "test/test_option_lzma.c",
     "test/test_option_lzop.c",
+    "test/test_option_mtime.c",
     "test/test_option_n.c",
     "test/test_option_newer_than.c",
     "test/test_option_nodump.c",
