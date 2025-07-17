@@ -129,7 +129,7 @@ pub fn build(b: *Build) !void {
     });
 
     for ([_][]const u8{ "cat", "cpio", "tar", "unzip" }) |mod_name| {
-        const enable_module_arg = b.fmt("enable-bsd{s}", .{mod_name});
+        const enable_module_arg = b.fmt("bsd{s}", .{mod_name});
         const enable_module_msg = b.fmt("enable build of bsd{s} (default=true)", .{mod_name});
         const enable_module = b.option(bool, enable_module_arg, enable_module_msg) orelse true;
         if (!enable_module) continue;
@@ -275,7 +275,7 @@ pub fn build(b: *Build) !void {
 
 fn configXAttr(config_h: *Step.ConfigHeader) void {
     // TODO:
-    // const enable_xattr = b.option(bool, enable-xattr, "Enable xattr support (default=true)");
+    // const enable_xattr = b.option(bool, xattr, "Enable xattr support (default=true)");
     config_h.addValues(.{
         .HAVE_ATTR_XATTR_H = null,
         .HAVE_SYS_XATTR_H = null,
@@ -313,7 +313,7 @@ const ConfigOptions = struct {
 
 fn configAcl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
     // TODO:
-    // const enable_acl = b.option(bool, enable-acl, "Enable acl support (default=true)") orelse !options.minimal;
+    // const enable_acl = b.option(bool, acl, "Enable acl support (default=true)") orelse !options.minimal;
     _ = b;
     _ = module;
     _ = options;
@@ -405,7 +405,7 @@ fn configB2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, opti
 }
 
 fn configBzip2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
-    if (b.option(bool, "enable-bzip2", "Build support for bzip2 through libbz2 (default=true)") orelse !options.minimal) {
+    if (b.option(bool, "bzip2", "Build support for bzip2 through libbz2 (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
             .HAVE_BZLIB_H = true,
             .HAVE_LIBBZ2 = true,
@@ -466,7 +466,7 @@ fn configIconv(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, o
     config_h.addValues(.{
         .HAVE_LOCALE_CHARSET = null,
     });
-    if (b.option(bool, "enable-iconv", "Enable iconv support (default=true)") orelse !options.minimal) {
+    if (b.option(bool, "iconv", "Enable iconv support (default=true)") orelse !options.minimal) {
         const target = module.resolved_target.?;
         const optimize = module.optimize.?;
 
@@ -516,7 +516,7 @@ fn configIconv(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, o
 }
 
 fn configLz4(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
-    if (b.option(bool, "enable-lz4", "Build support for lz4 through liblz4 (default=true)") orelse !options.minimal) {
+    if (b.option(bool, "lz4", "Build support for lz4 through liblz4 (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
             .HAVE_LIBLZ4 = true,
             .HAVE_LZ4HC_H = true,
@@ -587,7 +587,7 @@ fn configOpenSsl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module,
         .HAVE_LIBCRYPTO = null,
     });
 
-    if (b.option(bool, "enable-openssl", "Build support for mtree and xar hashes through openssl (default=true)") orelse !options.minimal) {
+    if (b.option(bool, "openssl", "Build support for mtree and xar hashes through openssl (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
             .HAVE_OPENSSL_EVP_H = true,
             .HAVE_OPENSSL_OPENSSLV_H = true,
@@ -649,7 +649,7 @@ fn configRegex(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, o
 }
 
 fn configXml2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
-    if (b.option(bool, "enable-xml2", "Build support for xar through libxml2 (default=true)") orelse !options.minimal) {
+    if (b.option(bool, "xml2", "Build support for xar through libxml2 (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
             .HAVE_LIBXML2 = true,
             .HAVE_LIBXML_XMLREADER_H = true,
@@ -670,7 +670,7 @@ fn configXml2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, op
 }
 
 fn configZlib(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
-    if (b.option(bool, "enable-zlib", "Build support for gzip through zlib (default=true)") orelse !options.minimal) {
+    if (b.option(bool, "zlib", "Build support for gzip through zlib (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
             .HAVE_ZLIB_H = true,
             .HAVE_LIBZ = true,
@@ -687,7 +687,7 @@ fn configZlib(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, op
 }
 
 fn configZstd(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
-    if (b.option(bool, "enable-zstd", "Build support for zstd through libzstd (default=true)") orelse !options.minimal) {
+    if (b.option(bool, "zstd", "Build support for zstd through libzstd (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
             .HAVE_LIBZSTD = true,
             .HAVE_ZSTD_H = true,
