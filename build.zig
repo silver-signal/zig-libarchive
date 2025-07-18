@@ -74,25 +74,27 @@ pub fn build(b: *Build) !void {
         .files = libarchive_src,
         .flags = flags,
     });
-    configAcl(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configB2(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configBzip2(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configExpat(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configIconv(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configLz4(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configLzma(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configLzo2(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configRegex(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configXml2(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configZlib(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configZstd(b, config_h, libarchive_module, .{ .minimal = minimal });
+
+    const config = ConfigOptions{ .target = target, .optimize = optimize, .minimal = minimal };
+    configAcl(b, config_h, libarchive_module, config);
+    configB2(b, config_h, libarchive_module, config);
+    configBzip2(b, config_h, libarchive_module, config);
+    configExpat(b, config_h, libarchive_module, config);
+    configIconv(b, config_h, libarchive_module, config);
+    configLz4(b, config_h, libarchive_module, config);
+    configLzma(b, config_h, libarchive_module, config);
+    configLzo2(b, config_h, libarchive_module, config);
+    configRegex(b, config_h, libarchive_module, config);
+    configXml2(b, config_h, libarchive_module, config);
+    configZlib(b, config_h, libarchive_module, config);
+    configZstd(b, config_h, libarchive_module, config);
 
     // TODO: The configure script does some specialized things for the crypto libraries.
     // For now, we'll just configure as normal, but we'll need to add special steps in the future.
-    configCng(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configMbedTls(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configNettle(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configOpenSsl(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configCng(b, config_h, libarchive_module, config);
+    configMbedTls(b, config_h, libarchive_module, config);
+    configNettle(b, config_h, libarchive_module, config);
+    configOpenSsl(b, config_h, libarchive_module, config);
 
     const libarchive = b.addLibrary(.{
         .name = package_name,
@@ -326,6 +328,8 @@ fn configXAttr(config_h: *Step.ConfigHeader) void {
 }
 
 const ConfigOptions = struct {
+    target: Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
     minimal: bool,
 };
 
@@ -428,7 +432,7 @@ fn configBzip2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, o
             .HAVE_BZLIB_H = true,
             .HAVE_LIBBZ2 = true,
         });
-        if (b.lazyDependency("bzip2", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |bzip2| {
+        if (b.lazyDependency("bzip2", .{ .target = options.target, .optimize = options.optimize })) |bzip2| {
             module.linkLibrary(bzip2.artifact("bz2"));
         }
     } else {
@@ -485,8 +489,8 @@ fn configIconv(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, o
         .HAVE_LOCALE_CHARSET = null,
     });
     if (b.option(bool, "iconv", "Enable iconv support (default=true)") orelse !options.minimal) {
-        const target = module.resolved_target.?;
-        const optimize = module.optimize.?;
+        const target = options.target;
+        const optimize = options.optimize;
 
         config_h.addValues(.{
             .HAVE_ICONV_H = true,
@@ -540,7 +544,7 @@ fn configLz4(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, opt
             .HAVE_LZ4HC_H = true,
             .HAVE_LZ4_H = true,
         });
-        if (b.lazyDependency("lz4", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |lz4| {
+        if (b.lazyDependency("lz4", .{ .target = options.target, .optimize = options.optimize })) |lz4| {
             module.linkLibrary(lz4.artifact("lz4"));
         }
     } else {
@@ -616,7 +620,7 @@ fn configOpenSsl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module,
             .ARCHIVE_CRYPTO_SHA384_OPENSSL = true,
             .ARCHIVE_CRYPTO_SHA512_OPENSSL = true,
         });
-        if (b.lazyDependency("openssl", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |openssl| {
+        if (b.lazyDependency("openssl", .{ .target = options.target, .optimize = options.optimize })) |openssl| {
             module.linkLibrary(openssl.artifact("openssl"));
         }
     } else {
@@ -674,7 +678,7 @@ fn configXml2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, op
             .HAVE_LIBXML_XMLWRITER_H = true,
             .HAVE_LIBXML_XMLVERSION_H = true,
         });
-        if (b.lazyDependency("libxml2", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |libxml2| {
+        if (b.lazyDependency("libxml2", .{ .target = options.target, .optimize = options.optimize })) |libxml2| {
             module.linkLibrary(libxml2.artifact("xml"));
         }
     } else {
@@ -693,7 +697,7 @@ fn configZlib(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, op
             .HAVE_ZLIB_H = true,
             .HAVE_LIBZ = true,
         });
-        if (b.lazyDependency("zlib", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |zlib| {
+        if (b.lazyDependency("zlib", .{ .target = options.target, .optimize = options.optimize })) |zlib| {
             module.linkLibrary(zlib.artifact("z"));
         }
     } else {
@@ -712,7 +716,7 @@ fn configZstd(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, op
             .HAVE_ZSTD_compressStream = true,
             .HAVE_ZSTD_minCLevel = true,
         });
-        if (b.lazyDependency("zstd", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |zstd| {
+        if (b.lazyDependency("zstd", .{ .target = options.target, .optimize = options.optimize })) |zstd| {
             module.linkLibrary(zstd.artifact("zstd"));
         }
     } else {
