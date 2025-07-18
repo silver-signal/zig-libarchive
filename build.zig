@@ -16,8 +16,8 @@ pub fn build(b: *Build) !void {
     const linkage = b.option(std.builtin.LinkMode, "linkage", "Link mode") orelse .static;
     const strip = b.option(bool, "strip", "Omit debug information");
     const pic = b.option(bool, "pic", "Produce Position Independent Code");
-    const sanitize_c = b.option(bool, "sanitize_c", "Enable C sanitizer") orelse false; // TODO: Switch to default true
-    const sanitize_thread = b.option(bool, "sanitize_thread", "Enable thread sanitizer.") orelse false; // TODO: Switch to default true
+    const sanitize_c = b.option(bool, "sanitize_c", "Enable C sanitizer");
+    const sanitize_thread = b.option(bool, "sanitize_thread", "Enable thread sanitizer.");
 
     const minimal = b.option(bool, "minimal", "Build minimal artifacts. Dependencies are all set to default=false. (default=false)") orelse false;
 
@@ -248,6 +248,8 @@ pub fn build(b: *Build) !void {
         .target = target,
         .optimize = optimize,
         .link_libc = true,
+        .sanitize_c = sanitize_c,
+        .sanitize_thread = sanitize_thread,
     });
     libarchive_test_module.addIncludePath(upstream.path("libarchive/test"));
     libarchive_test_module.addCSourceFiles(.{
