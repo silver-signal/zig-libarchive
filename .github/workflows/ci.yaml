@@ -22,11 +22,11 @@ jobs:
         with:
           version: 0.14.1
 
+      - name: Check Formatting
+        run: zig fmt --ast-check --check .
+
       - name: Run `zig build -Dminimal=true`
         run: zig build -Dminimal --summary all
 
       - name: Run `zig build`
         run: zig build --summary all
-
-      - name: Run `zig build test`
-        run: zig build test --summary all

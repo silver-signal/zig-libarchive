@@ -3,8 +3,8 @@ const package_name = package["lib".len..];
 
 const version: std.SemanticVersion = .{
     .major = 3,
-    .minor = 7,
-    .patch = 9,
+    .minor = 8,
+    .patch = 1,
 };
 const version_string = std.fmt.comptimePrint("{}", .{version});
 
@@ -16,7 +16,8 @@ pub fn build(b: *Build) !void {
     const linkage = b.option(std.builtin.LinkMode, "linkage", "Link mode") orelse .static;
     const strip = b.option(bool, "strip", "Omit debug information");
     const pic = b.option(bool, "pic", "Produce Position Independent Code");
-    const sanitize_c = b.option(bool, "sanitize_c", "Enable C sanitizer") orelse false; // TODO: Switch to default true
+    const sanitize_c = b.option(bool, "sanitize_c", "Enable C sanitizer");
+    const sanitize_thread = b.option(bool, "sanitize_thread", "Enable thread sanitizer.");
 
     const minimal = b.option(bool, "minimal", "Build minimal artifacts. Dependencies are all set to default=false. (default=false)") orelse false;
 
@@ -53,7 +54,7 @@ pub fn build(b: *Build) !void {
 
     var flags_list = try std.ArrayList([]const u8).initCapacity(b.allocator, flags_default.len);
     try flags_list.appendSlice(flags_default);
-    //    if (linkage == .static) try flags_list.append("-DLIBARCHIVE_STATIC");
+    if (linkage == .static) try flags_list.append("-DLIBARCHIVE_STATIC");
     const flags: []const []const u8 = try flags_list.toOwnedSlice();
 
     // The core libarchive module. All other binaries depend on this.
@@ -64,6 +65,7 @@ pub fn build(b: *Build) !void {
         .strip = strip,
         .pic = pic,
         .sanitize_c = sanitize_c,
+        .sanitize_thread = sanitize_thread,
     });
     libarchive_module.addConfigHeader(config_h);
     libarchive_module.addIncludePath(upstream.path(""));
@@ -72,25 +74,27 @@ pub fn build(b: *Build) !void {
         .files = libarchive_src,
         .flags = flags,
     });
-    configAcl(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configB2(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configBzip2(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configExpat(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configIconv(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configLz4(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configLzma(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configLzo2(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configRegex(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configXml2(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configZlib(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configZstd(b, config_h, libarchive_module, .{ .minimal = minimal });
+
+    const config = ConfigOptions{ .target = target, .optimize = optimize, .minimal = minimal };
+    configAcl(b, config_h, libarchive_module, config);
+    configB2(b, config_h, libarchive_module, config);
+    configBzip2(b, config_h, libarchive_module, config);
+    configExpat(b, config_h, libarchive_module, config);
+    configIconv(b, config_h, libarchive_module, config);
+    configLz4(b, config_h, libarchive_module, config);
+    configLzma(b, config_h, libarchive_module, config);
+    configLzo2(b, config_h, libarchive_module, config);
+    configRegex(b, config_h, libarchive_module, config);
+    configXml2(b, config_h, libarchive_module, config);
+    configZlib(b, config_h, libarchive_module, config);
+    configZstd(b, config_h, libarchive_module, config);
 
     // TODO: The configure script does some specialized things for the crypto libraries.
     // For now, we'll just configure as normal, but we'll need to add special steps in the future.
-    configCng(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configMbedTls(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configNettle(b, config_h, libarchive_module, .{ .minimal = minimal });
-    configOpenSsl(b, config_h, libarchive_module, .{ .minimal = minimal });
+    configCng(b, config_h, libarchive_module, config);
+    configMbedTls(b, config_h, libarchive_module, config);
+    configNettle(b, config_h, libarchive_module, config);
+    configOpenSsl(b, config_h, libarchive_module, config);
 
     const libarchive = b.addLibrary(.{
         .name = package_name,
@@ -113,6 +117,7 @@ pub fn build(b: *Build) !void {
         .strip = strip,
         .pic = pic,
         .sanitize_c = sanitize_c,
+        .sanitize_thread = sanitize_thread,
     });
     libarchive_fe_module.addCSourceFiles(.{
         .root = upstream.path("libarchive_fe"),
@@ -123,14 +128,13 @@ pub fn build(b: *Build) !void {
     libarchive_fe_module.addConfigHeader(config_h);
 
     const libarchive_fe = b.addLibrary(.{
-        .name = "libarchive_fe",
+        .name = "archive_fe",
         .root_module = libarchive_fe_module,
         .linkage = .static,
     });
 
-    const module_names: []const []const u8 = &.{ "cat", "cpio", "tar", "unzip" };
-    for (module_names) |mod_name| {
-        const enable_module_arg = b.fmt("enable-bsd{s}", .{mod_name});
+    for ([_][]const u8{ "cat", "cpio", "tar", "unzip" }) |mod_name| {
+        const enable_module_arg = b.fmt("bsd{s}", .{mod_name});
         const enable_module_msg = b.fmt("enable build of bsd{s} (default=true)", .{mod_name});
         const enable_module = b.option(bool, enable_module_arg, enable_module_msg) orelse true;
         if (!enable_module) continue;
@@ -143,21 +147,25 @@ pub fn build(b: *Build) !void {
             .strip = strip,
             .pic = pic,
             .sanitize_c = sanitize_c,
+            .sanitize_thread = sanitize_thread,
         });
         exe_module.addConfigHeader(config_h);
         exe_module.addIncludePath(upstream.path(""));
+
         exe_module.addCSourceFiles(.{
             .root = upstream.path(mod_name),
-            .files = src_map.get(mod_name) orelse unreachable,
+            .files = src_map.get(mod_name).?,
             .flags = flags,
         });
         exe_module.addCSourceFiles(.{
             .root = upstream.path(mod_name),
-            .files = main_src_map.get(mod_name) orelse unreachable,
+            .files = main_src_map.get(mod_name).?,
             .flags = flags,
         });
+
         exe_module.addIncludePath(upstream.path("libarchive"));
         exe_module.linkLibrary(libarchive);
+
         exe_module.addIncludePath(upstream.path("libarchive_fe"));
         exe_module.linkLibrary(libarchive_fe);
 
@@ -180,29 +188,44 @@ pub fn build(b: *Build) !void {
             .strip = strip,
             .pic = pic,
             .sanitize_c = sanitize_c,
+            .sanitize_thread = sanitize_thread,
         });
+        test_module.addConfigHeader(config_h);
+        test_module.addIncludePath(upstream.path(""));
+
+        const mod_test_path = upstream.path(b.fmt("{s}/test", .{mod_name}));
         test_module.addCSourceFiles(.{
-            .root = upstream.path(mod_name),
-            .files = test_src_map.get(mod_name) orelse unreachable,
+            .root = mod_test_path,
+            .files = test_src_map.get(mod_name).?,
             .flags = flags,
         });
         test_module.addCSourceFiles(.{
             .root = b.path(b.fmt("disabled_tests/{s}", .{mod_name})),
-            .files = disabled_test_src_map.get(mod_name) orelse unreachable,
+            .files = disabled_test_src_map.get(mod_name).?,
             .flags = flags,
         });
+
+        test_module.addIncludePath(b.path("test_utils"));
         test_module.addCSourceFiles(.{
-            .root = upstream.path("test_utils"),
+            .root = b.path("test_utils"),
             .files = test_utils_src,
             .flags = flags,
         });
-        test_module.addConfigHeader(config_h);
-        test_module.addIncludePath(upstream.path(""));
-        test_module.addIncludePath(upstream.path("test_utils"));
+
+        if (std.mem.eql(u8, mod_name, "cpio")) {
+            test_module.addCSourceFiles(.{
+                .root = upstream.path(mod_name),
+                .files = src_map.get(mod_name).?,
+                .flags = flags,
+            });
+        }
+
+        test_module.addIncludePath(upstream.path(mod_name));
+        test_module.addIncludePath(mod_test_path);
+
         test_module.addIncludePath(upstream.path("libarchive"));
         test_module.linkLibrary(libarchive);
-        test_module.addIncludePath(upstream.path(mod_name));
-        test_module.addIncludePath(upstream.path(b.fmt("{s}/test", .{mod_name})));
+
         test_module.addIncludePath(upstream.path("libarchive_fe"));
         test_module.linkLibrary(libarchive_fe);
 
@@ -214,6 +237,10 @@ pub fn build(b: *Build) !void {
         exe_test_run.setCwd(upstream.path(""));
         exe_test_run.addArg("-p");
         exe_test_run.addArtifactArg(exe);
+        exe_test_run.addArgs(&.{ "-v", "-d", "-k" });
+        if (b.args) |args| {
+            exe_test_run.addArgs(args);
+        }
         exe_test_step.dependOn(&exe_test_run.step);
     }
 
@@ -223,27 +250,32 @@ pub fn build(b: *Build) !void {
         .target = target,
         .optimize = optimize,
         .link_libc = true,
+        .sanitize_c = sanitize_c,
+        .sanitize_thread = sanitize_thread,
     });
+    libarchive_test_module.addIncludePath(upstream.path("libarchive/test"));
     libarchive_test_module.addCSourceFiles(.{
         .root = upstream.path("libarchive/test"),
         .files = libarchive_test_src,
         .flags = flags,
     });
+    libarchive_test_module.addIncludePath(upstream.path(""));
+    libarchive_test_module.addConfigHeader(config_h);
+
+    libarchive_test_module.addIncludePath(b.path("test_utils"));
     libarchive_test_module.addCSourceFiles(.{
-        .root = upstream.path("test_utils"),
+        .root = b.path("test_utils"),
         .files = test_utils_src,
         .flags = flags,
     });
+
     libarchive_test_module.addCSourceFiles(.{
         .root = b.path("disabled_tests/libarchive"),
         .files = libarchive_test_disabled_src,
         .flags = flags,
     });
-    libarchive_test_module.addConfigHeader(config_h);
-    libarchive_test_module.addIncludePath(upstream.path(""));
-    libarchive_test_module.addIncludePath(upstream.path("test_utils"));
+
     libarchive_test_module.addIncludePath(upstream.path("libarchive"));
-    libarchive_test_module.addIncludePath(upstream.path("libarchive/test"));
     libarchive_test_module.linkLibrary(libarchive);
 
     const libarchive_test = b.addExecutable(.{
@@ -252,14 +284,18 @@ pub fn build(b: *Build) !void {
     });
     const libarchive_test_run = b.addRunArtifact(libarchive_test);
     libarchive_test_run.setCwd(upstream.path(""));
-    libarchive_test_run.addArg("-v");
-    libarchive_test_run.addArg("-d");
+    libarchive_test_run.addArgs(&.{ "-v", "-d", "-k" });
+    if (b.args) |args| {
+        libarchive_test_run.addArgs(args);
+    }
+    libarchive_test_run.setEnvironmentVariable("LRZIP", "NOCONFIG");
+    libarchive_test_run.setEnvironmentVariable("UBSAN", "silence_unsigned_overflow=1");
     libarchive_test_step.dependOn(&libarchive_test_run.step);
 }
 
 fn configXAttr(config_h: *Step.ConfigHeader) void {
     // TODO:
-    // const enable_xattr = b.option(bool, enable-xattr, "Enable xattr support (default=true)");
+    // const enable_xattr = b.option(bool, xattr, "Enable xattr support (default=true)");
     config_h.addValues(.{
         .HAVE_ATTR_XATTR_H = null,
         .HAVE_SYS_XATTR_H = null,
@@ -267,6 +303,7 @@ fn configXAttr(config_h: *Step.ConfigHeader) void {
         .ARCHIVE_XATTR_DARWIN = null,
         .ARCHIVE_XATTR_FREEBSD = null,
         .ARCHIVE_XATTR_LINUX = null,
+        .LIBATTR_PKGCONFIG_VERSION = null,
         .HAVE_DECL_XATTR_NOFOLLOW = null,
         .HAVE_GETXATTR = null,
         .HAVE_SETXATTR = null,
@@ -285,18 +322,20 @@ fn configXAttr(config_h: *Step.ConfigHeader) void {
         .HAVE_EXTATTR_LIST_LINK = null,
         .HAVE_EXTATTR_SET_FD = null,
         .HAVE_EXTATTR_SET_LINK = null,
-        .HAVE_DECL_EXTATTR_NAMESPACE_USER = false,
+        .HAVE_DECL_EXTATTR_NAMESPACE_USER = null,
         .HAVE_SYS_EXTATTR_H = null,
     });
 }
 
 const ConfigOptions = struct {
+    target: Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
     minimal: bool,
 };
 
 fn configAcl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
     // TODO:
-    // const enable_acl = b.option(bool, enable-acl, "Enable acl support (default=true)") orelse !options.minimal;
+    // const enable_acl = b.option(bool, acl, "Enable acl support (default=true)") orelse !options.minimal;
     _ = b;
     _ = module;
     _ = options;
@@ -370,6 +409,8 @@ fn configAcl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, opt
         .HAVE_DECL_GETACL = null,
         .HAVE_DECL_SETACL = null,
         .HAVE_DECL_GETACLCNT = null,
+        .LIBACL_PKGCONFIG_VERSION = null,
+        .LIBRICHACL_PKGCONFIG_VERSION = null,
     });
 }
 
@@ -381,16 +422,17 @@ fn configB2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, opti
     config_h.addValues(.{
         .HAVE_BLAKE2_H = null,
         .HAVE_LIBB2 = null,
+        .LIBB2_PKGCONFIG_VERSION = null,
     });
 }
 
 fn configBzip2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
-    if (b.option(bool, "enable-bzip2", "Build support for bzip2 through libbz2 (default=true)") orelse !options.minimal) {
+    if (b.option(bool, "bzip2", "Build support for bzip2 through libbz2 (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
             .HAVE_BZLIB_H = true,
             .HAVE_LIBBZ2 = true,
         });
-        if (b.lazyDependency("bzip2", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |bzip2| {
+        if (b.lazyDependency("bzip2", .{ .target = options.target, .optimize = options.optimize })) |bzip2| {
             module.linkLibrary(bzip2.artifact("bz2"));
         }
     } else {
@@ -420,6 +462,7 @@ fn configMbedTls(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module,
         .HAVE_MBEDTLS_AES_H = null,
         .HAVE_MBEDTLS_MD_H = null,
         .HAVE_MBEDTLS_PKCS5_H = null,
+        .HAVE_MBEDTLS_VERSION_H = null,
         .HAVE_LIBMBEDCRYPTO = null,
         .ARCHIVE_CRYPTO_MD5_MBEDTLS = null,
         .ARCHIVE_CRYPTO_RMD160_MBEDTLS = null,
@@ -445,9 +488,9 @@ fn configIconv(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, o
     config_h.addValues(.{
         .HAVE_LOCALE_CHARSET = null,
     });
-    if (b.option(bool, "enable-iconv", "Enable iconv support (default=true)") orelse !options.minimal) {
-        const target = module.resolved_target.?;
-        const optimize = module.optimize.?;
+    if (b.option(bool, "iconv", "Enable iconv support (default=true)") orelse !options.minimal) {
+        const target = options.target;
+        const optimize = options.optimize;
 
         config_h.addValues(.{
             .HAVE_ICONV_H = true,
@@ -464,12 +507,14 @@ fn configIconv(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, o
         switch (impl) {
             .libc => {
                 config_h.addValues(.{
+                    .HAVE_LIBICONV = null,
                     .HAVE_LOCALCHARSET_H = null,
                     .HAVE_LIBCHARSET = null,
                 });
             },
             .libiconv => {
                 config_h.addValues(.{
+                    .HAVE_LIBICONV = true,
                     .HAVE_LOCALCHARSET_H = true,
                     .HAVE_LIBCHARSET = true,
                 });
@@ -484,6 +529,7 @@ fn configIconv(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, o
         config_h.addValues(.{
             .HAVE_ICONV_H = null,
             .HAVE_ICONV = null,
+            .HAVE_LIBICONV = null,
             .ICONV_CONST = null,
             .HAVE_LOCALCHARSET_H = null,
             .HAVE_LIBCHARSET = null,
@@ -492,13 +538,13 @@ fn configIconv(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, o
 }
 
 fn configLz4(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
-    if (b.option(bool, "enable-lz4", "Build support for lz4 through liblz4 (default=true)") orelse !options.minimal) {
+    if (b.option(bool, "lz4", "Build support for lz4 through liblz4 (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
             .HAVE_LIBLZ4 = true,
             .HAVE_LZ4HC_H = true,
             .HAVE_LZ4_H = true,
         });
-        if (b.lazyDependency("lz4", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |lz4| {
+        if (b.lazyDependency("lz4", .{ .target = options.target, .optimize = options.optimize })) |lz4| {
             module.linkLibrary(lz4.artifact("lz4"));
         }
     } else {
@@ -553,6 +599,7 @@ fn configNettle(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, 
         .HAVE_NETTLE_PBKDF2_H = null,
         .HAVE_NETTLE_RIPEMD160_H = null,
         .HAVE_NETTLE_SHA_H = null,
+        .HAVE_NETTLE_VERSION_H = null,
     });
 }
 
@@ -562,10 +609,10 @@ fn configOpenSsl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module,
         .HAVE_LIBCRYPTO = null,
     });
 
-    if (b.option(bool, "enable-openssl", "Build support for mtree and xar hashes through openssl (default=true)") orelse !options.minimal) {
+    if (b.option(bool, "openssl", "Build support for mtree and xar hashes through openssl (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
-            .HAVE_LIBCRYPTO = null,
             .HAVE_OPENSSL_EVP_H = true,
+            .HAVE_OPENSSL_OPENSSLV_H = true,
             .ARCHIVE_CRYPTO_MD5_OPENSSL = true,
             .ARCHIVE_CRYPTO_RMD160_OPENSSL = true,
             .ARCHIVE_CRYPTO_SHA1_OPENSSL = true,
@@ -573,12 +620,13 @@ fn configOpenSsl(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module,
             .ARCHIVE_CRYPTO_SHA384_OPENSSL = true,
             .ARCHIVE_CRYPTO_SHA512_OPENSSL = true,
         });
-        if (b.lazyDependency("openssl", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |openssl| {
+        if (b.lazyDependency("openssl", .{ .target = options.target, .optimize = options.optimize })) |openssl| {
             module.linkLibrary(openssl.artifact("openssl"));
         }
     } else {
         config_h.addValues(.{
             .HAVE_OPENSSL_EVP_H = null,
+            .HAVE_OPENSSL_OPENSSLV_H = null,
             .ARCHIVE_CRYPTO_MD5_OPENSSL = null,
             .ARCHIVE_CRYPTO_RMD160_OPENSSL = null,
             .ARCHIVE_CRYPTO_SHA1_OPENSSL = null,
@@ -623,13 +671,14 @@ fn configRegex(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, o
 }
 
 fn configXml2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
-    if (b.option(bool, "enable-xml2", "Build support for xar through libxml2 (default=true)") orelse !options.minimal) {
+    if (b.option(bool, "xml2", "Build support for xar through libxml2 (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
             .HAVE_LIBXML2 = true,
             .HAVE_LIBXML_XMLREADER_H = true,
             .HAVE_LIBXML_XMLWRITER_H = true,
+            .HAVE_LIBXML_XMLVERSION_H = true,
         });
-        if (b.lazyDependency("libxml2", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |libxml2| {
+        if (b.lazyDependency("libxml2", .{ .target = options.target, .optimize = options.optimize })) |libxml2| {
             module.linkLibrary(libxml2.artifact("xml"));
         }
     } else {
@@ -637,29 +686,37 @@ fn configXml2(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, op
             .HAVE_LIBXML2 = null,
             .HAVE_LIBXML_XMLREADER_H = null,
             .HAVE_LIBXML_XMLWRITER_H = null,
+            .HAVE_LIBXML_XMLVERSION_H = null,
         });
     }
 }
 
 fn configZlib(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
-    if (b.option(bool, "enable-zlib", "Build support for gzip through zlib (default=true)") orelse !options.minimal) {
-        config_h.addValues(.{ .HAVE_ZLIB_H = true });
-        if (b.lazyDependency("zlib", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |zlib| {
+    if (b.option(bool, "zlib", "Build support for gzip through zlib (default=true)") orelse !options.minimal) {
+        config_h.addValues(.{
+            .HAVE_ZLIB_H = true,
+            .HAVE_LIBZ = true,
+        });
+        if (b.lazyDependency("zlib", .{ .target = options.target, .optimize = options.optimize })) |zlib| {
             module.linkLibrary(zlib.artifact("z"));
         }
     } else {
-        config_h.addValues(.{ .HAVE_ZLIB_H = null });
+        config_h.addValues(.{
+            .HAVE_ZLIB_H = null,
+            .HAVE_LIBZ = null,
+        });
     }
 }
 
 fn configZstd(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, options: ConfigOptions) void {
-    if (b.option(bool, "enable-zstd", "Build support for zstd through libzstd (default=true)") orelse !options.minimal) {
+    if (b.option(bool, "zstd", "Build support for zstd through libzstd (default=true)") orelse !options.minimal) {
         config_h.addValues(.{
             .HAVE_LIBZSTD = true,
             .HAVE_ZSTD_H = true,
             .HAVE_ZSTD_compressStream = true,
+            .HAVE_ZSTD_minCLevel = true,
         });
-        if (b.lazyDependency("zstd", .{ .target = module.resolved_target.?, .optimize = module.optimize.? })) |zstd| {
+        if (b.lazyDependency("zstd", .{ .target = options.target, .optimize = options.optimize })) |zstd| {
             module.linkLibrary(zstd.artifact("zstd"));
         }
     } else {
@@ -667,6 +724,7 @@ fn configZstd(b: *Build, config_h: *Step.ConfigHeader, module: *Build.Module, op
             .HAVE_LIBZSTD = null,
             .HAVE_ZSTD_H = null,
             .HAVE_ZSTD_compressStream = null,
+            .HAVE_ZSTD_minCLevel = null,
         });
     }
 }
@@ -1114,11 +1172,11 @@ const libarchive_src: []const []const u8 = &.{
     "archive_entry_stat.c",
     "archive_entry_strmode.c",
     "archive_entry_xattr.c",
-    "archive_getdate.c",
     "archive_hmac.c",
     "archive_match.c",
     "archive_options.c",
     "archive_pack_dev.c",
+    "archive_parse_date.c",
     "archive_pathmatch.c",
     "archive_ppmd7.c",
     "archive_ppmd8.c",
@@ -1144,8 +1202,8 @@ const libarchive_src: []const []const u8 = &.{
     "archive_read_support_filter_by_code.c",
     "archive_read_support_filter_bzip2.c",
     "archive_read_support_filter_compress.c",
-    "archive_read_support_filter_gzip.c",
     "archive_read_support_filter_grzip.c",
+    "archive_read_support_filter_gzip.c",
     "archive_read_support_filter_lrzip.c",
     "archive_read_support_filter_lz4.c",
     "archive_read_support_filter_lzop.c",
@@ -1174,6 +1232,7 @@ const libarchive_src: []const []const u8 = &.{
     "archive_read_support_format_zip.c",
     "archive_string.c",
     "archive_string_sprintf.c",
+    "archive_time.c",
     "archive_util.c",
     "archive_version_details.c",
     "archive_virtual.c",
@@ -1242,17 +1301,18 @@ const libarchive_test_src: []const []const u8 = &.{
     "test_acl_platform_posix1e.c",
     "test_acl_posix1e.c",
     "test_acl_text.c",
+    "test_ar_mode.c",
     "test_archive_api_feature.c",
     "test_archive_clear_error.c",
     "test_archive_cmdline.c",
     "test_archive_digest.c",
-    "test_archive_getdate.c",
     "test_archive_match_owner.c",
     "test_archive_match_path.c",
     "test_archive_match_time.c",
+    "test_archive_parse_date.c",
     "test_archive_pathmatch.c",
-    "test_archive_read_add_passphrase.c",
     "test_archive_read.c",
+    "test_archive_read_add_passphrase.c",
     "test_archive_read_close_twice.c",
     "test_archive_read_close_twice_open_fd.c",
     "test_archive_read_close_twice_open_filename.c",
@@ -1276,7 +1336,6 @@ const libarchive_test_src: []const []const u8 = &.{
     "test_archive_write_set_option.c",
     "test_archive_write_set_options.c",
     "test_archive_write_set_passphrase.c",
-    "test_ar_mode.c",
     "test_bad_fd.c",
     "test_compat_bzip2.c",
     "test_compat_cpio.c",
@@ -1330,7 +1389,7 @@ const libarchive_test_src: []const []const u8 = &.{
     "test_read_filter_program_signature.c",
     "test_read_filter_uudecode.c",
     "test_read_filter_uudecode_raw.c",
-    "test_read_format_7zip.c",
+    //"test_read_format_7zip.c", // Disabled: Fails an assertion; needs investigation.
     "test_read_format_7zip_encryption_data.c",
     "test_read_format_7zip_encryption_header.c",
     "test_read_format_7zip_encryption_partially.c",
@@ -1340,56 +1399,58 @@ const libarchive_test_src: []const []const u8 = &.{
     "test_read_format_cab.c",
     "test_read_format_cab_filename.c",
     "test_read_format_cpio_afio.c",
+    "test_read_format_cpio_bin.c",
+    "test_read_format_cpio_bin_Z.c",
     "test_read_format_cpio_bin_be.c",
     "test_read_format_cpio_bin_bz2.c",
-    "test_read_format_cpio_bin.c",
     "test_read_format_cpio_bin_gz.c",
     "test_read_format_cpio_bin_le.c",
     "test_read_format_cpio_bin_lzip.c",
     "test_read_format_cpio_bin_lzma.c",
     "test_read_format_cpio_bin_xz.c",
-    "test_read_format_cpio_bin_Z.c",
     "test_read_format_cpio_filename.c",
     "test_read_format_cpio_odc.c",
     "test_read_format_cpio_svr4_bzip2_rpm.c",
-    "test_read_format_cpio_svr4c_Z.c",
     "test_read_format_cpio_svr4_gzip.c",
     "test_read_format_cpio_svr4_gzip_rpm.c",
+    "test_read_format_cpio_svr4c_Z.c",
     "test_read_format_empty.c",
     "test_read_format_gtar_filename.c",
     "test_read_format_gtar_gz.c",
     "test_read_format_gtar_lzma.c",
+    "test_read_format_gtar_redundant_L.c",
     "test_read_format_gtar_sparse.c",
     "test_read_format_gtar_sparse_length.c",
     "test_read_format_gtar_sparse_skip_entry.c",
     "test_read_format_huge_rpm.c",
+    "test_read_format_iso_Z.c",
+    "test_read_format_iso_multi_extent.c",
+    "test_read_format_iso_xorriso.c",
     "test_read_format_isojoliet_bz2.c",
     "test_read_format_isojoliet_long.c",
     "test_read_format_isojoliet_rr.c",
     "test_read_format_isojoliet_versioned.c",
-    "test_read_format_iso_multi_extent.c",
     "test_read_format_isorr_bz2.c",
     "test_read_format_isorr_ce.c",
     "test_read_format_isorr_new_bz2.c",
     "test_read_format_isorr_rr_moved.c",
-    "test_read_format_iso_xorriso.c",
-    "test_read_format_iso_Z.c",
     "test_read_format_isozisofs_bz2.c",
-    "test_read_format_lha_bugfix_0.c",
     "test_read_format_lha.c",
+    "test_read_format_lha_bugfix_0.c",
     "test_read_format_lha_filename.c",
     "test_read_format_lha_filename_utf16.c",
     "test_read_format_mtree.c",
     "test_read_format_mtree_crash747.c",
     "test_read_format_pax_bz2.c",
-    "test_read_format_rar5.c",
     "test_read_format_rar.c",
+    "test_read_format_rar5.c",
     "test_read_format_rar_encryption.c",
     "test_read_format_rar_encryption_data.c",
     "test_read_format_rar_encryption_header.c",
     "test_read_format_rar_encryption_partially.c",
     "test_read_format_rar_filter.c",
     "test_read_format_rar_invalid1.c",
+    "test_read_format_rar_overflow.c",
     "test_read_format_raw.c",
     "test_read_format_tar.c",
     "test_read_format_tar_concatenated.c",
@@ -1398,7 +1459,10 @@ const libarchive_test_src: []const []const u8 = &.{
     "test_read_format_tar_empty_with_gnulabel.c",
     "test_read_format_tar_filename.c",
     "test_read_format_tar_invalid_pax_size.c",
+    "test_read_format_tar_mac_metadata.c",
+    "test_read_format_tar_pax_g_large.c",
     "test_read_format_tar_pax_large_attr.c",
+    "test_read_format_tar_pax_negative_time.c",
     "test_read_format_tbz.c",
     "test_read_format_tgz.c",
     "test_read_format_tlz.c",
@@ -1408,8 +1472,8 @@ const libarchive_test_src: []const []const u8 = &.{
     "test_read_format_warc.c",
     "test_read_format_xar.c",
     "test_read_format_xar_doublelink.c",
-    "test_read_format_zip_7075_utf8_paths.c",
     "test_read_format_zip.c",
+    "test_read_format_zip_7075_utf8_paths.c",
     "test_read_format_zip_comment_stored.c",
     "test_read_format_zip_encryption_data.c",
     "test_read_format_zip_encryption_header.c",
@@ -1431,6 +1495,7 @@ const libarchive_test_src: []const []const u8 = &.{
     "test_read_format_zip_with_invalid_traditional_eocd.c",
     "test_read_format_zip_zip64.c",
     "test_read_large.c",
+    "test_read_pax_empty_val_no_nl.c",
     "test_read_pax_truncated.c",
     "test_read_pax_xattr_rht_security_selinux.c",
     "test_read_pax_xattr_schily.c",
@@ -1440,14 +1505,14 @@ const libarchive_test_src: []const []const u8 = &.{
     "test_read_truncated.c",
     "test_read_truncated_filter.c",
     "test_short_writes.c",
-    //"test_sparse_basic.c", SKIP: triggers UBSAN
+    // "test_sparse_basic.c", // SKIP: triggers UBSAN
     "test_tar_filenames.c",
     "test_tar_large.c",
     "test_ustar_filename_encoding.c",
     "test_ustar_filenames.c",
     "test_warn_missing_hardlink_target.c",
-    "test_write_disk_appledouble.c",
     "test_write_disk.c",
+    "test_write_disk_appledouble.c",
     "test_write_disk_failures.c",
     "test_write_disk_fixup.c",
     "test_write_disk_hardlink.c",
@@ -1456,10 +1521,10 @@ const libarchive_test_src: []const []const u8 = &.{
     "test_write_disk_mac_metadata.c",
     "test_write_disk_no_hfs_compression.c",
     "test_write_disk_perms.c",
+    "test_write_disk_secure.c",
     "test_write_disk_secure744.c",
     "test_write_disk_secure745.c",
     "test_write_disk_secure746.c",
-    "test_write_disk_secure.c",
     "test_write_disk_secure_noabsolutepaths.c",
     "test_write_disk_sparse.c",
     "test_write_disk_symlink.c",
@@ -1488,21 +1553,22 @@ const libarchive_test_src: []const []const u8 = &.{
     "test_write_format_cpio_odc.c",
     "test_write_format_gnutar.c",
     "test_write_format_gnutar_filenames.c",
-    "test_write_format_iso9660_boot.c",
     "test_write_format_iso9660.c",
+    "test_write_format_iso9660_boot.c",
     "test_write_format_iso9660_empty.c",
     "test_write_format_iso9660_filename.c",
     "test_write_format_iso9660_zisofs.c",
-    "test_write_format_mtree_absolute_path.c",
     "test_write_format_mtree.c",
+    "test_write_format_mtree_absolute_path.c",
     "test_write_format_mtree_classic.c",
     "test_write_format_mtree_classic_indent.c",
     "test_write_format_mtree_fflags.c",
     "test_write_format_mtree_no_separator.c",
+    "test_write_format_mtree_preset_digests.c",
     "test_write_format_mtree_quoted_filename.c",
     "test_write_format_pax.c",
-    "test_write_format_raw_b64.c",
     "test_write_format_raw.c",
+    "test_write_format_raw_b64.c",
     "test_write_format_shar_empty.c",
     "test_write_format_tar.c",
     "test_write_format_tar_empty.c",
@@ -1513,15 +1579,18 @@ const libarchive_test_src: []const []const u8 = &.{
     "test_write_format_warc_empty.c",
     "test_write_format_xar.c",
     "test_write_format_xar_empty.c",
-    "test_write_format_zip64_stream.c",
     "test_write_format_zip.c",
+    "test_write_format_zip64_stream.c",
+    "test_write_format_zip_compression_bzip2.c",
+    "test_write_format_zip_compression_lzmaxz.c",
     "test_write_format_zip_compression_store.c",
+    "test_write_format_zip_compression_zstd.c",
     "test_write_format_zip_empty.c",
     "test_write_format_zip_empty_zip64.c",
     "test_write_format_zip_entry_size_unset.c",
     "test_write_format_zip_file.c",
     "test_write_format_zip_file_zip64.c",
-    //"test_write_format_zip_large.c", SKIP: triggers UBSAN
+    "test_write_format_zip_large.c",
     "test_write_format_zip_stream.c",
     "test_write_format_zip_windows_path.c",
     "test_write_format_zip_zip64.c",
@@ -1532,13 +1601,13 @@ const libarchive_test_src: []const []const u8 = &.{
 };
 
 const libarchive_test_disabled_src: []const []const u8 = &.{
+    "test_read_format_7zip.c",
     "test_sparse_basic.c",
-    "test_write_format_zip_large.c",
 };
 
 const test_src_map = StaticStringMap([]const []const u8).initComptime(.{
-    .{ "cat", bsdcat_src ++ bsdcat_test_src },
-    .{ "cpio", bsdcpio_src ++ bsdcpio_test_src },
+    .{ "cat", bsdcat_test_src },
+    .{ "cpio", bsdcpio_test_src },
     .{ "tar", bsdtar_test_src },
     .{ "unzip", bsdunzip_test_src },
 });
@@ -1551,179 +1620,180 @@ const disabled_test_src_map = StaticStringMap([]const []const u8).initComptime(.
 });
 
 const bsdcat_test_src: []const []const u8 = &.{
-    "test/test_0.c",
-    "test/test_empty_gz.c",
-    "test/test_empty_lz4.c",
-    "test/test_empty_xz.c",
-    "test/test_empty_zstd.c",
-    "test/test_error.c",
-    "test/test_error_mixed.c",
-    "test/test_expand_Z.c",
-    "test/test_expand_bz2.c",
-    "test/test_expand_gz.c",
-    "test/test_expand_lz4.c",
-    "test/test_expand_mixed.c",
-    "test/test_expand_plain.c",
-    "test/test_expand_xz.c",
-    "test/test_expand_zstd.c",
-    "test/test_help.c",
-    "test/test_stdin.c",
-    "test/test_version.c",
+    "test_0.c",
+    "test_empty_gz.c",
+    "test_empty_lz4.c",
+    "test_empty_xz.c",
+    "test_empty_zstd.c",
+    "test_error.c",
+    "test_error_mixed.c",
+    "test_expand_Z.c",
+    "test_expand_bz2.c",
+    "test_expand_gz.c",
+    "test_expand_lz4.c",
+    "test_expand_mixed.c",
+    "test_expand_plain.c",
+    "test_expand_xz.c",
+    "test_expand_zstd.c",
+    "test_help.c",
+    "test_stdin.c",
+    "test_version.c",
 };
 
 const bsdcat_disabled_test_src: []const []const u8 = &.{};
 
 const bsdcpio_test_src: []const []const u8 = &.{
-    "test/test_0.c",
-    "test/test_basic.c",
-    "test/test_cmdline.c",
-    "test/test_extract_cpio_Z.c",
-    "test/test_extract_cpio_absolute_paths.c",
-    "test/test_extract_cpio_bz2.c",
-    "test/test_extract_cpio_grz.c",
-    "test/test_extract_cpio_gz.c",
-    "test/test_extract_cpio_lrz.c",
-    "test/test_extract_cpio_lz.c",
-    "test/test_extract_cpio_lz4.c",
-    "test/test_extract_cpio_lzma.c",
-    "test/test_extract_cpio_lzo.c",
-    "test/test_extract_cpio_xz.c",
-    "test/test_extract_cpio_zstd.c",
-    "test/test_format_newc.c",
-    "test/test_gcpio_compat.c",
-    "test/test_missing_file.c",
-    "test/test_option_0.c",
-    "test/test_option_B_upper.c",
-    "test/test_option_C_upper.c",
-    "test/test_option_J_upper.c",
-    "test/test_option_L_upper.c",
-    "test/test_option_Z_upper.c",
-    "test/test_option_a.c",
-    "test/test_option_b64encode.c",
-    "test/test_option_c.c",
-    "test/test_option_d.c",
-    "test/test_option_f.c",
-    "test/test_option_grzip.c",
-    "test/test_option_help.c",
-    "test/test_option_l.c",
-    "test/test_option_lrzip.c",
-    "test/test_option_lz4.c",
-    "test/test_option_lzma.c",
-    "test/test_option_lzop.c",
-    "test/test_option_m.c",
-    "test/test_option_passphrase.c",
-    "test/test_option_t.c",
-    "test/test_option_u.c",
-    "test/test_option_uuencode.c",
-    "test/test_option_version.c",
-    "test/test_option_xz.c",
-    "test/test_option_y.c",
-    "test/test_option_z.c",
-    "test/test_option_zstd.c",
-    "test/test_owner_parse.c",
-    "test/test_passthrough_dotdot.c",
-    "test/test_passthrough_reverse.c",
+    "test_0.c",
+    "test_basic.c",
+    "test_cmdline.c",
+    "test_extract_cpio_Z.c",
+    "test_extract_cpio_absolute_paths.c",
+    "test_extract_cpio_bz2.c",
+    "test_extract_cpio_grz.c",
+    "test_extract_cpio_gz.c",
+    "test_extract_cpio_lrz.c",
+    "test_extract_cpio_lz.c",
+    "test_extract_cpio_lz4.c",
+    "test_extract_cpio_lzma.c",
+    "test_extract_cpio_lzo.c",
+    "test_extract_cpio_xz.c",
+    "test_extract_cpio_zstd.c",
+    "test_format_newc.c",
+    "test_gcpio_compat.c",
+    "test_missing_file.c",
+    "test_option_0.c",
+    "test_option_B_upper.c",
+    "test_option_C_upper.c",
+    "test_option_J_upper.c",
+    "test_option_L_upper.c",
+    "test_option_Z_upper.c",
+    "test_option_a.c",
+    "test_option_b64encode.c",
+    "test_option_c.c",
+    "test_option_d.c",
+    "test_option_f.c",
+    "test_option_grzip.c",
+    "test_option_help.c",
+    "test_option_l.c",
+    "test_option_lrzip.c",
+    "test_option_lz4.c",
+    "test_option_lzma.c",
+    "test_option_lzop.c",
+    "test_option_m.c",
+    "test_option_passphrase.c",
+    "test_option_t.c",
+    "test_option_u.c",
+    "test_option_uuencode.c",
+    "test_option_version.c",
+    "test_option_xz.c",
+    "test_option_y.c",
+    "test_option_z.c",
+    "test_option_zstd.c",
+    "test_owner_parse.c",
+    "test_passthrough_dotdot.c",
+    "test_passthrough_reverse.c",
 };
 
 const bsdcpio_disabled_test_src: []const []const u8 = &.{};
 
 const bsdtar_test_src: []const []const u8 = &.{
-    "test/test_0.c",
-    "test/test_basic.c",
-    "test/test_copy.c",
-    "test/test_empty_mtree.c",
-    "test/test_extract_tar_Z.c",
-    "test/test_extract_tar_bz2.c",
-    "test/test_extract_tar_grz.c",
-    "test/test_extract_tar_gz.c",
-    "test/test_extract_tar_lrz.c",
-    "test/test_extract_tar_lz.c",
-    "test/test_extract_tar_lz4.c",
-    "test/test_extract_tar_lzma.c",
-    "test/test_extract_tar_lzo.c",
-    "test/test_extract_tar_xz.c",
-    "test/test_extract_tar_zstd.c",
-    "test/test_format_newc.c",
-    "test/test_help.c",
-    "test/test_leading_slash.c",
-    "test/test_list_item.c",
-    "test/test_missing_file.c",
-    "test/test_option_C_mtree.c",
-    "test/test_option_C_upper.c",
-    "test/test_option_H_upper.c",
-    "test/test_option_L_upper.c",
-    "test/test_option_O_upper.c",
-    "test/test_option_P_upper.c",
-    "test/test_option_T_upper.c",
-    "test/test_option_U_upper.c",
-    "test/test_option_X_upper.c",
-    "test/test_option_a.c",
-    "test/test_option_acls.c",
-    "test/test_option_b.c",
-    "test/test_option_b64encode.c",
-    "test/test_option_exclude.c",
-    "test/test_option_exclude_vcs.c",
-    "test/test_option_fflags.c",
-    "test/test_option_gid_gname.c",
-    "test/test_option_group.c",
-    "test/test_option_grzip.c",
-    "test/test_option_ignore_zeros.c",
-    "test/test_option_j.c",
-    "test/test_option_k.c",
-    "test/test_option_keep_newer_files.c",
-    "test/test_option_lrzip.c",
-    "test/test_option_lz4.c",
-    "test/test_option_lzma.c",
-    "test/test_option_lzop.c",
-    "test/test_option_n.c",
-    "test/test_option_newer_than.c",
-    "test/test_option_nodump.c",
-    "test/test_option_older_than.c",
-    "test/test_option_owner.c",
-    "test/test_option_passphrase.c",
-    "test/test_option_q.c",
-    "test/test_option_r.c",
-    "test/test_option_s.c",
-    "test/test_option_safe_writes.c",
-    "test/test_option_uid_uname.c",
-    "test/test_option_uuencode.c",
-    "test/test_option_xattrs.c",
-    "test/test_option_xz.c",
-    "test/test_option_z.c",
-    "test/test_option_zstd.c",
-    "test/test_patterns.c",
-    "test/test_print_longpath.c",
-    "test/test_stdio.c",
-    "test/test_strip_components.c",
-    "test/test_symlink_dir.c",
-    "test/test_version.c",
-    "test/test_windows.c",
+    "test_0.c",
+    "test_basic.c",
+    "test_copy.c",
+    "test_empty_mtree.c",
+    "test_extract_tar_Z.c",
+    "test_extract_tar_bz2.c",
+    "test_extract_tar_grz.c",
+    "test_extract_tar_gz.c",
+    "test_extract_tar_lrz.c",
+    "test_extract_tar_lz.c",
+    "test_extract_tar_lz4.c",
+    "test_extract_tar_lzma.c",
+    "test_extract_tar_lzo.c",
+    "test_extract_tar_xz.c",
+    "test_extract_tar_zstd.c",
+    "test_format_newc.c",
+    "test_help.c",
+    "test_leading_slash.c",
+    "test_list_item.c",
+    "test_missing_file.c",
+    "test_option_C_mtree.c",
+    "test_option_C_upper.c",
+    "test_option_H_upper.c",
+    "test_option_L_upper.c",
+    "test_option_O_upper.c",
+    "test_option_P_upper.c",
+    "test_option_T_upper.c",
+    "test_option_U_upper.c",
+    "test_option_X_upper.c",
+    "test_option_a.c",
+    "test_option_acls.c",
+    "test_option_b.c",
+    "test_option_b64encode.c",
+    "test_option_exclude.c",
+    "test_option_exclude_vcs.c",
+    "test_option_fflags.c",
+    "test_option_gid_gname.c",
+    "test_option_group.c",
+    "test_option_grzip.c",
+    "test_option_ignore_zeros.c",
+    "test_option_j.c",
+    "test_option_k.c",
+    "test_option_keep_newer_files.c",
+    "test_option_lrzip.c",
+    "test_option_lz4.c",
+    "test_option_lzma.c",
+    "test_option_lzop.c",
+    "test_option_mtime.c",
+    "test_option_n.c",
+    "test_option_newer_than.c",
+    "test_option_nodump.c",
+    "test_option_older_than.c",
+    "test_option_owner.c",
+    "test_option_passphrase.c",
+    "test_option_q.c",
+    "test_option_r.c",
+    "test_option_s.c",
+    "test_option_safe_writes.c",
+    "test_option_uid_uname.c",
+    "test_option_uuencode.c",
+    "test_option_xattrs.c",
+    "test_option_xz.c",
+    "test_option_z.c",
+    "test_option_zstd.c",
+    "test_patterns.c",
+    "test_print_longpath.c",
+    "test_stdio.c",
+    "test_strip_components.c",
+    "test_symlink_dir.c",
+    "test_version.c",
+    "test_windows.c",
 };
 
 const bsdtar_disabled_test_src: []const []const u8 = &.{};
 
 const bsdunzip_test_src: []const []const u8 = &.{
-    "test/test_0.c",
-    "test/test_C.c",
-    "test/test_I.c",
-    "test/test_L.c",
-    //"test/test_P_encryption.c", SKIPPED due to test failures
-    "test/test_Z1.c",
-    "test/test_basic.c",
-    "test/test_d.c",
-    "test/test_doubledash.c",
-    "test/test_glob.c",
-    "test/test_j.c",
-    "test/test_n.c",
-    "test/test_not_exist.c",
-    "test/test_o.c",
-    "test/test_p.c",
-    "test/test_q.c",
-    "test/test_singlefile.c",
-    "test/test_t.c",
-    "test/test_t_bad.c",
-    "test/test_version.c",
-    "test/test_x.c",
+    "test_0.c",
+    "test_C.c",
+    "test_I.c",
+    "test_L.c",
+    //"test_P_encryption.c", SKIPPED due to test failures
+    "test_Z1.c",
+    "test_basic.c",
+    "test_d.c",
+    "test_doubledash.c",
+    "test_glob.c",
+    "test_j.c",
+    "test_n.c",
+    "test_not_exist.c",
+    "test_o.c",
+    "test_p.c",
+    "test_q.c",
+    "test_singlefile.c",
+    "test_t.c",
+    "test_t_bad.c",
+    "test_version.c",
+    "test_x.c",
 };
 
 const bsdunzip_disabled_test_src: []const []const u8 = &.{
