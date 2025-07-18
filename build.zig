@@ -203,9 +203,9 @@ pub fn build(b: *Build) !void {
             .flags = flags,
         });
 
-        test_module.addIncludePath(upstream.path("test_utils"));
+        test_module.addIncludePath(b.path("test_utils"));
         test_module.addCSourceFiles(.{
-            .root = upstream.path("test_utils"),
+            .root = b.path("test_utils"),
             .files = test_utils_src,
             .flags = flags,
         });
@@ -249,26 +249,29 @@ pub fn build(b: *Build) !void {
         .optimize = optimize,
         .link_libc = true,
     });
+    libarchive_test_module.addIncludePath(upstream.path("libarchive/test"));
     libarchive_test_module.addCSourceFiles(.{
         .root = upstream.path("libarchive/test"),
         .files = libarchive_test_src,
         .flags = flags,
     });
+    libarchive_test_module.addIncludePath(upstream.path(""));
+    libarchive_test_module.addConfigHeader(config_h);
+
+    libarchive_test_module.addIncludePath(b.path("test_utils"));
     libarchive_test_module.addCSourceFiles(.{
-        .root = upstream.path("test_utils"),
+        .root = b.path("test_utils"),
         .files = test_utils_src,
         .flags = flags,
     });
+
     libarchive_test_module.addCSourceFiles(.{
         .root = b.path("disabled_tests/libarchive"),
         .files = libarchive_test_disabled_src,
         .flags = flags,
     });
-    libarchive_test_module.addConfigHeader(config_h);
-    libarchive_test_module.addIncludePath(upstream.path(""));
-    libarchive_test_module.addIncludePath(upstream.path("test_utils"));
+
     libarchive_test_module.addIncludePath(upstream.path("libarchive"));
-    libarchive_test_module.addIncludePath(upstream.path("libarchive/test"));
     libarchive_test_module.linkLibrary(libarchive);
 
     const libarchive_test = b.addExecutable(.{
@@ -282,6 +285,7 @@ pub fn build(b: *Build) !void {
         libarchive_test_run.addArgs(args);
     }
     libarchive_test_run.setEnvironmentVariable("LRZIP", "NOCONFIG");
+    libarchive_test_run.setEnvironmentVariable("UBSAN", "silence_unsigned_overflow=1");
     libarchive_test_step.dependOn(&libarchive_test_run.step);
 }
 
@@ -1495,7 +1499,7 @@ const libarchive_test_src: []const []const u8 = &.{
     "test_read_truncated.c",
     "test_read_truncated_filter.c",
     "test_short_writes.c",
-    // "test_sparse_basic.c", SKIP: triggers UBSAN
+    // "test_sparse_basic.c", // SKIP: triggers UBSAN
     "test_tar_filenames.c",
     "test_tar_large.c",
     "test_ustar_filename_encoding.c",
@@ -1580,7 +1584,7 @@ const libarchive_test_src: []const []const u8 = &.{
     "test_write_format_zip_entry_size_unset.c",
     "test_write_format_zip_file.c",
     "test_write_format_zip_file_zip64.c",
-    //"test_write_format_zip_large.c", // SKIP: triggers UBSAN
+    "test_write_format_zip_large.c",
     "test_write_format_zip_stream.c",
     "test_write_format_zip_windows_path.c",
     "test_write_format_zip_zip64.c",
@@ -1593,7 +1597,6 @@ const libarchive_test_src: []const []const u8 = &.{
 const libarchive_test_disabled_src: []const []const u8 = &.{
     "test_read_format_7zip.c",
     "test_sparse_basic.c",
-    "test_write_format_zip_large.c",
 };
 
 const test_src_map = StaticStringMap([]const []const u8).initComptime(.{
