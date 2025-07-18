@@ -126,7 +126,7 @@ pub fn build(b: *Build) !void {
     libarchive_fe_module.addConfigHeader(config_h);
 
     const libarchive_fe = b.addLibrary(.{
-        .name = "libarchive_fe",
+        .name = "archive_fe",
         .root_module = libarchive_fe_module,
         .linkage = .static,
     });
